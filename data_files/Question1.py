@@ -7,23 +7,49 @@ visits = pd.read_csv('./data_files/visits.csv',index_col = 'datestamp',parse_dat
 
 def plotByCountryAndMarket(kayakDataFrame,savepath = None):
     for country in set(kayakDataFrame.country_code):
-        print country
         restrictedKayakDataFrame = kayakDataFrame[(kayakDataFrame.country_code == country)]
-        fig = plt.figure()
+        fig = plt.figure(figsize=(15, 12))
         uniqueChannels = set(restrictedKayakDataFrame.marketing_channel)
         for i, channel in enumerate(uniqueChannels):
+            singleChannelKayakDataFrame = restrictedKayakDataFrame[(restrictedKayakDataFrame.marketing_channel == channel)]
             plt.subplot(len(uniqueChannels),1,i+1)
             if i == 0:
-                plt.title('conversions for ' + country)
-            restrictedKayakDataFrame[(restrictedKayakDataFrame.marketing_channel == channel)].conversions.plot()
+                plt.title(singleChannelKayakDataFrame.keys()[-1] + ' for ' + country)
+            plt.figure(fig.number)
+            singleChannelKayakDataFrame[singleChannelKayakDataFrame.keys()[-1]].plot()
             plt.xlabel('time')
             plt.ylabel(channel)
         if savepath:
             plt.savefig(savepath + country + '.jpg')
             plt.close()
 
-plotByCountryAndMarket(conversions,'./conversions')
-plotByCountryAndMarket(visits,'./visits')
+
+
+def plotByMarketAndCountry(kayakDataFrame,savepath = None):
+    for channel in set(conversions.marketing_channel):
+        restrictedKayakDataFrame = kayakDataFrame[(kayakDataFrame.marketing_channel == channel)]
+        fig = plt.figure(figsize=(15, 12))
+        uniqueContries = set(restrictedKayakDataFrame.country_code)
+        for i, country in enumerate(uniqueContries):
+            singleCountryKayakDataFrame = restrictedKayakDataFrame[(restrictedKayakDataFrame.country_code == country)]
+            plt.subplot(len(uniqueContries),1,i+1)
+            if i == 0:
+                plt.title(singleCountryKayakDataFrame.keys()[-1] + ' for ' + channel)
+            singleCountryKayakDataFrame[singleCountryKayakDataFrame.keys()[-1]].plot()
+            plt.xlabel('time')
+            plt.ylabel(country)
+        if savepath:
+            plt.savefig(savepath + channel + '.jpg')
+            plt.close()
+
+
+
+plotByCountryAndMarket(conversions,'./conversions_')
+plotByCountryAndMarket(visits,'./visits_')
+
+
+plotByMarketAndCountry(conversions,'./conversions_')
+plotByMarketAndCountry(visits,'./visits_')
 
 conversionValues = conversions.conversions.values
 def plotFourrie(npArray):

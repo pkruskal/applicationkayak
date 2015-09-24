@@ -16,6 +16,31 @@ def plotEstimates(kayakDataFrame,savepath=None):
             #del thisKayakDataFrame['marketing_channel']
             #del thisKayakDataFrame['country_code']
 
+            #check if there is a low number samples
+            if thisKayakDataFrame.shape[0] < 150:
+                print country + ' ' + channel
+                thisKayakDataFrame = replaceMissingDaysWithZero(thisKayakDataFrame)
+                endMonthMedian = thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].loc[pd.date_range(dt.datetime(2015,8,01,00,00,00), periods=31, freq='D')].median()
+                earlierMonthMedian = thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].loc[pd.date_range(dt.datetime(2015,4,01,00,00,00), periods=31, freq='D')].median()
+                if endMonthMedian > 3.0*earlierMonthMedian:
+                    #then assum trending
+                    print ' trending'
+                    plt.plot(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values,'r')
+                    plt.ylabel(country)
+                else:
+                    plt.plot(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values,'k')
+                    plt.ylabel(country)
+                continue
+
+            #handle cases differently when there is a low overall number
+            if thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].median() < 100:
+                print country + ' ' + channel + ' median of ' + str(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].median()) + ' std of ' + str(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].std())
+                plt.subplot(len(uniqueContries),1,i+1)
+                plt.plot(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values)
+                plt.plot(np.array([1,thisKayakDataFrame.shape[0]]),thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].mean()*np.ones(2),'k',linewidth = 2)
+                plt.ylabel(country)
+                continue
+
             #check for data integrety
             thisKayakDataFrame = replaceMissingDaysWithZero(thisKayakDataFrame)
 
@@ -35,6 +60,7 @@ def plotEstimates(kayakDataFrame,savepath=None):
             else:
                 plt.subplot(len(uniqueContries),1,i+1)
                 plt.plot(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values)
+                plt.ylabel(country)
 
         if savepath:
             #plt.savefig(savepath + channel + '.jpg')
@@ -57,13 +83,14 @@ def plotFourrie(npArray,plots = 1):
     globalpeak= power[np.where(freqs < 1.0/2.5) and np.where(freqs > 1.0/30)].max()
     return weekpeak/globalpeak
 
-def trendDecomposition(kayakDataFrame):
-
+def trendDecomposition(kayakDF2detrend):
+    zeroidx = np.where(kayakDF2detrend[kayakDF2detrend.keys()[-1]].values == 0)[0]
+    kayakDF2detrend[kayakDF2detrend.keys()[-1]][zeroidx] = np.finfo(float).eps
     #weekly decomposition
     import statsmodels.api as sm
-    res = sm.tsa.seasonal_decompose(kayakDataFrame.values,model="multiplicative",freq=7)
-    kayakDataFrame['trend'] = res.trend
-    return kayakDataFrame
+    res = sm.tsa.seasonal_decompose(kayakDF2detrend.values,model="multiplicative",freq=7)
+    kayakDF2detrend['trend'] = res.trend
+    return kayakDF2detrend
 
 def replaceMissingDaysWithZero(kayakDataFrameWithMissing):
     # like many functions used here, I take advantage of the fact that in these
@@ -99,8 +126,8 @@ def appendTimeProxi(dFrame2append):
     return dFrame2append
 
 
-conversions = pd.read_csv('./data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
-#conversions = pd.read_csv('D:/KAYAKtest/data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
+#conversions = pd.read_csv('./data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
+conversions = pd.read_csv('D:/KAYAKtest/data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
 
 plotEstimates(conversions)
 

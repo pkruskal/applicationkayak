@@ -99,8 +99,8 @@ def appendTimeProxi(dFrame2append):
     return dFrame2append
 
 
-#conversions = pd.read_csv('./data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
-conversions = pd.read_csv('D:/KAYAKtest/data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
+conversions = pd.read_csv('./data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
+#conversions = pd.read_csv('D:/KAYAKtest/data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
 
 plotEstimates(conversions)
 

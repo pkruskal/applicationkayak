@@ -94,9 +94,12 @@ def plotConversionReteByChannel():
         theseConversions = conversions[(conversions.marketing_channel == channel)]
         theseVisits = visits[(visits.marketing_channel == channel)]
 
-        #index on country and date to align for the join command to add visits
+        #perform an outer join on the data aligning to the date, country code and marketing channel
+
+        #first make datestamp a column to perform the join on
         theseConversions.reset_index(level=0, inplace=True)
         theseVisits.reset_index(level=0, inplace=True)
+
         valsAndConversions = pd.merge(theseVisits, theseConversions, how='outer', on=['datestamp', 'country_code','marketing_channel'])
         valsAndConversions = valsAndConversions.set_index('datestamp')
 
@@ -150,18 +153,34 @@ import datetime as dt
 visits = pd.read_csv('./data_files/visits.csv',index_col = 'datestamp',parse_dates=True)
 visits = visits.groupby(visits.index).sum()
 
-#adding as missing data
+#weekly decomposition
+import statsmodels.api as sm
+res = sm.tsa.seasonal_decompose(visits.values,model="multiplicative",freq=7)
+visits['trend'] = res.trend
 
+
+#adding as missing data
 #extending Nov and Dec as from year 2014
 base = dt.datetime(2015,9,01,00,00,00)
 septToOct = [base + dt.timedelta(days=x) for x in range(0, 61)]
 for date in septToOct:
     visits.loc[date] = np.nan
 
+#taggin on nov and dec 2014 as proxi for 2015
 for day in np.arange(1, 62):
-    visits.loc[septToOct[-1] + dt.timedelta(days=day)] = visits.user_visits[day-1]
+    visits.loc[septToOct[-1] + dt.timedelta(days=day)] = visits.loc[dt.datetime(2014,11,01,00,00,00) + dt.timedelta(days=day-1)]
+
+visitsSpline5 = visits.interpolate(method = 'spline',order = 5)
+visitsSpline10 = visits.interpolate(method = 'spline',order = 3)
+visitsCupic = visits.interpolate(method = 'cubic')
+visitsQuadratic = visits.interpolate(method = 'quadratic')
+visitsBasic = visits.interpolate()
+
+#res = sm.tsa.seasonal_decompose(visits.loc[dt.datetime(2014,11,01,00,00,00) : base+ dt.timedelta(days=-1)].values,model="multiplicative",freq=7)
+#visits['trend'].loc[dt.datetime(2014,11,01,00,00,00) : base+ dt.timedelta(days=-1)] = res.trend
+
 
 visitsBasic = visits.interpolate()
 visitsCupic = visits.interpolate(method = 'cubic')
 visitsQuadratic = visits.interpolate(method = 'quadratic')
-visitsQuadratic = visits.interpolate(method = 'spline',order = 5)
+visitsSpline5 = visits.interpolate(method = 'spline',order = 5)

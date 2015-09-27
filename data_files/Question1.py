@@ -7,8 +7,6 @@ import numpy as np
 # Question 1
 ###
 
-conversions = pd.read_csv('./data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
-visits = pd.read_csv('./data_files/visits.csv',index_col = 'datestamp',parse_dates=True)
 
 def plotByCountryAndMarket(kayakDataFrame,savepath = None):
     for country in set(kayakDataFrame.country_code):
@@ -24,6 +22,23 @@ def plotByCountryAndMarket(kayakDataFrame,savepath = None):
             singleChannelKayakDataFrame[singleChannelKayakDataFrame.keys()[-1]].plot()
             plt.xlabel('time')
             plt.ylabel(channel)
+
+            '''
+            #check weekly power ratio
+            powRatio = plotFourrie(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values,plots = 1)
+
+            if powRatio > 0.8:
+                copyKayakDataFrame = thisKayakDataFrame.copy('deep')
+                del copyKayakDataFrame['marketing_channel']
+                del copyKayakDataFrame['country_code']
+                trended = trendDecomposition(copyKayakDataFrame)
+                appended = appendTimeProxi(trended)
+                plt.subplot(len(uniqueContries),1,i+1)
+                plt.plot(appended['trend'].values)
+                plt.plot(appended[appended.keys()[0]].values)
+                plt.ylabel(country)
+            '''
+
         if savepath:
             plt.savefig(savepath + country + '.jpg')
             plt.close()
@@ -63,6 +78,15 @@ def plotFourrie(npArray):
     globalpeak= power[np.where(freqs < 1.0/2.5) and np.where(freqs > 1.0/30)].max()
     return weekpeak/globalpeak
 
+def removeOutlier4Conversions(conversions):
+    conversions.loc[conversions['conversions'] > 100000] = np.nan
+    return conversions
+
+
+conversions = pd.read_csv('./data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
+visits = pd.read_csv('./data_files/visits.csv',index_col = 'datestamp',parse_dates=True)
+
+conversions = removeOutlier4Conversions(conversions)
 
 plotByCountryAndMarket(conversions,'./conversions_')
 plotByCountryAndMarket(visits,'./visits_')

@@ -2,9 +2,14 @@ import numpy as np
 import pandas as pd
 import matplotlib.pylab as plt
 import datetime as dt
+import scipy as sci
 
-def plotEstimates(kayakDataFrame,savepath=None):
+def plotRateEstimates(kayakDataFrame,savepath=None):
+    channelRates = {}
+
     for channel in set(kayakDataFrame.marketing_channel):
+        channelRates[channel] = []
+
         singleChannelKayakDataFrame = kayakDataFrame[(kayakDataFrame.marketing_channel == channel)]
         fig = plt.figure(figsize=(15, 12))
         uniqueContries = set(singleChannelKayakDataFrame.country_code)
@@ -16,56 +21,61 @@ def plotEstimates(kayakDataFrame,savepath=None):
             #del thisKayakDataFrame['marketing_channel']
             #del thisKayakDataFrame['country_code']
 
+            print country + ' ' + channel
+
             #check if there is a low number samples
-            if thisKayakDataFrame.shape[0] < 150:
-                print country + ' ' + channel
+            if thisKayakDataFrame.shape[0] < 200:
                 thisKayakDataFrame = replaceMissingDaysWithZero(thisKayakDataFrame)
+                channelRates[channel].append(thisKayakDataFrame['rate'].mean()*31.0)
+
+
                 endMonthMedian = thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].loc[pd.date_range(dt.datetime(2015,8,01,00,00,00), periods=31, freq='D')].median()
                 earlierMonthMedian = thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].loc[pd.date_range(dt.datetime(2015,4,01,00,00,00), periods=31, freq='D')].median()
                 if endMonthMedian > 3.0*earlierMonthMedian:
                     #then assum trending
                     print ' trending'
-                    plt.plot(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values,'r')
+                    appended = appendTimeProxi(thisKayakDataFrame)
+                    plt.plot(appended[appended.keys()[-1]].values,'r')
                     plt.ylabel(country)
                 else:
-                    plt.plot(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values,'k')
+                    appended = appendTimeProxi(thisKayakDataFrame)
+                    plt.plot(appended[appended.keys()[-1]].values,'k')
                     plt.ylabel(country)
                 continue
 
+            #replace missing data with epsilon values
+            thisKayakDataFrame = replaceMissingDaysWithZero(thisKayakDataFrame)
+
+
+            '''
             #handle cases differently when there is a low overall number
             if thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].median() < 100:
                 print country + ' ' + channel + ' median of ' + str(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].median()) + ' std of ' + str(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].std())
+                appended = appendTimeProxi(thisKayakDataFrame)
                 plt.subplot(len(uniqueContries),1,i+1)
-                plt.plot(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values)
-                plt.plot(np.array([1,thisKayakDataFrame.shape[0]]),thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].mean()*np.ones(2),'k',linewidth = 2)
+                plt.plot(appended[appended.keys()[-1]].values)
+                plt.plot(np.array([1,appended.shape[0]]),appended[appended.keys()[-1]].mean()*np.ones(2),'k',linewidth = 2)
                 plt.ylabel(country)
                 continue
+            '''
 
-            #check for data integrety
-            thisKayakDataFrame = replaceMissingDaysWithZero(thisKayakDataFrame)
+            thisKayakDataFrame['rollingMeanRate'] = pd.rolling_mean(thisKayakDataFrame['rate'],14)
+            #nanIdx = np.where(np.isnan(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values))[0]
+            #thisKayakDataFrameNoNans = thisKayakDataFrame.dropna(subset = ['rollingMeanRate'])
 
-            #check weekly power ratio
-            powRatio = plotFourrie(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values,plots = 0)
+            appended = appendTimeProxi(thisKayakDataFrame)
+            appended = appended.interpolate()
+            plt.subplot(len(uniqueContries),1,i+1)
+            plt.plot(appended['rollingMeanRate'].values)
+            plt.ylabel(country)
 
-            if powRatio > 0.8:
-                copyKayakDataFrame = thisKayakDataFrame.copy('deep')
-                del copyKayakDataFrame['marketing_channel']
-                del copyKayakDataFrame['country_code']
-                trended = trendDecomposition(copyKayakDataFrame)
-                appended = appendTimeProxi(trended)
-                plt.subplot(len(uniqueContries),1,i+1)
-                plt.plot(appended['trend'].values)
-                plt.plot(appended[appended.keys()[0]].values)
-                plt.ylabel(country)
-            else:
-                plt.subplot(len(uniqueContries),1,i+1)
-                plt.plot(thisKayakDataFrame[thisKayakDataFrame.keys()[-1]].values)
-                plt.ylabel(country)
+            channelRates[channel].append(appended[thisKayakDataFrame.keys()[-1]].loc[pd.date_range(dt.datetime(2015,9,01,00,00,00), periods=30, freq='D')].mean())
 
+        print channel
         if savepath:
-            #plt.savefig(savepath + channel + '.jpg')
-            #plt.close()
-            pass
+            plt.savefig(savepath + str(channel) + '.jpg')
+            plt.close()
+    return channelRates
 
 def plotFourrie(npArray,plots = 1):
     samples2use = int(2**np.floor(np.log2(npArray.shape[0])))
@@ -125,9 +135,33 @@ def appendTimeProxi(dFrame2append):
 
     return dFrame2append
 
+def removeOutlier4Conversions(conversions):
+    #conversions.loc[conversions['conversions'] > 100000] = np.nan
+    conversions = conversions.loc[conversions['conversions'] < 100000]
+    return conversions
 
-#conversions = pd.read_csv('./data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
-conversions = pd.read_csv('D:/KAYAKtest/data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
+def findRate():
+    conversions = pd.read_csv('D:/KAYAKtest/data_files/conversions.csv',index_col = 'datestamp',parse_dates=True)
+    visits = pd.read_csv('D:/KAYAKtest/data_files/visits.csv',index_col = 'datestamp',parse_dates=True)
 
-plotEstimates(conversions)
+    #remove outlier
+    conversions = removeOutlier4Conversions(conversions)
 
+    #merge them
+    conversions.reset_index(level=0, inplace=True)
+    visits.reset_index(level=0, inplace=True)
+    visitsAndConversions = pd.merge(visits, conversions, how='outer', on=['datestamp', 'country_code','marketing_channel'])
+    visitsAndConversions = visitsAndConversions.set_index('datestamp')
+    #if there is a visit value, but no conversion value (ie nan) then set conversion to 0
+    visitsAndConversions.conversions.values[[[np.array(~np.isnan(visitsAndConversions.user_visits)) * np.array(np.isnan(visitsAndConversions.conversions))][0]]] = 0
+    visitsAndConversions['rate'] = visitsAndConversions['conversions']/visitsAndConversions['user_visits']
+    return visitsAndConversions
+
+mergedFields = findRate()
+
+plt.close('all')
+#channelRates = plotRateEstimates(mergedFields)
+channelRates = plotRateEstimates(mergedFields,savepath = './ratePredictions_')
+
+
+#rollingMean = pd.rolling_mean(df['Close'], 100)
